@@ -1,0 +1,1113 @@
+openapi: 3.0.3
+info:
+  title: WASAPhoto
+  description: |
+    Keep in touch with your friends by sharing photos of
+    special moments, thanks to WASAPhoto! You can upload your photos
+    directly from your PC, and they will be visible to everyone
+    following you.
+  version: 1.0.0
+
+tags:
+  - name: login
+    description: Endpoint to manage the login operation
+  - name: profile
+    description: Endpoint to manage user's profile
+  - name: stream
+    description: Endpoint to manage user's stream
+  - name: search
+    description: Endpoint to manage the search operation
+  - name: photos
+    description: Endpoint to manage photos
+  - name: likes
+    description: Endpoint to manage likes
+  - name: comments
+    description: Endpoint to manage comments
+  - name: followers
+    description: Endpoint to manage followers
+  - name: following
+    description: Endpoint to manage following
+  - name: ban
+    description: Endpoint to manage banning operation
+
+paths:
+  /session:
+    post:
+      tags: ["login"]
+      summary: Logs in the user
+      description: |-
+        If the user does not exist, it will be created,
+        and an identifier is returned.
+        If the user exists, the user identifier is returned.
+      operationId: doLogin
+      requestBody:
+        description: User details
+        content:
+          application/json:
+            schema:
+              description: the username of the user
+              type: object
+              properties:
+                name:
+                  $ref: "#/components/schemas/username"
+        required: true
+      responses:
+        "200":
+          description: User log-in action successful
+          content:
+            application/json:
+              schema:
+                description: the userid of the user
+                type: object
+                properties:
+                  identifier:
+                    $ref: "#/components/schemas/user"
+        "201":
+          description: A new user is created and logged in
+          content:
+            application/json:
+              schema:
+                description: the userid of the user
+                type: object
+                properties:
+                  identifier:
+                    $ref: "#/components/schemas/user"
+
+  #####################################################################
+
+  /users/{uid}/profile:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+
+    get:
+      tags: ["profile"]
+      summary: gets the uid's profile
+      description: this operation returns the user's profile
+      operationId: getUserProfile
+      responses:
+        "200":
+          description: the user's profile is returned in the content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/userProfile"
+        "206":
+          description: uid is banned by the user that executes the operation, the response is partial
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/partialProfile"
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+  #####################################################################
+
+  /users/{uid}/profile/username:
+    parameters:
+      - $ref: "#/components/parameters/userid"
+
+    put:
+      tags: [ "profile" ]
+      summary: sets a new username
+      description: the user can choose and set his username
+      operationId: setMyUserName
+      requestBody:
+        description: the user's new username
+        content:
+          application/json:
+            schema:
+              description: an object representing the user's new username
+              type: object
+              properties:
+                newname:
+                  $ref: "#/components/schemas/username"
+        required: true
+      responses:
+        "200":
+          description: setMyUserName operation was successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/username"
+        "400":
+          description: the length of the username doesn't match the constraints
+        "401":
+          description: the user has no right to access this resource
+        "403":
+          description: the username is already used by someone else
+
+      security:
+        - bearerAuth: [ ]
+
+  #####################################################################
+
+  /users/{uid}/profile/profile_picture:
+    parameters:
+      - $ref: "#/components/parameters/userid"
+
+    put:
+      tags: ["profile"]
+      summary: choose a picture for the profile
+      description: the user can choose and set a new picture for his/her profile
+      operationId: setMyProfilePicture
+      requestBody:
+        description: the new profile picture
+        content:
+          image/*:
+            schema:
+              description: an object representing the image chosen
+              type: object
+              properties:
+                newpicture:
+                  $ref: "#/components/schemas/binaryImage"
+        required: true
+      responses:
+        "201":
+          description: the profile picture is updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/image"
+        "401":
+          description: the user has no right to access this resource
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: [ ]
+
+  #####################################################################
+
+  /users/{uid}/profile/profile_picture/{imageId}:
+    parameters:
+      - $ref: "#/components/parameters/userid"
+      - $ref: "#/components/parameters/imageIdParam"
+    get:
+      tags: ["profile"]
+      summary: returns a profile picture
+      description: a user can access a profile picture if he/she is the owner or if the owner has not banned him/her
+      operationId: getProfPict
+      responses:
+        "200":
+          description: the image is returned in the content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/image"
+        "401":
+          description: the user has no right to access this resource
+        "403":
+          description: the owner of the image has banned the user that called the operation
+        "404":
+          description: image not found
+
+  #####################################################################
+
+  /users/{uid}/search/{searchedname}:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+    - $ref: "#/components/parameters/searchednameParam"
+
+    get:
+      tags: ["search"]
+      summary: search a user using his/her username or userid or part of them
+      description: |
+        returns a list of partial profiles, representing the userid, username and profile picture
+        of all the user whose userid or whose username matches at least partially searchedname
+      operationId: searchUser
+      responses:
+        "200":
+          description: the users found are listed in the content
+          content:
+            application/json:
+              schema:
+                description: an array containing the users whose userid or whose username matches at least partially searchedname
+                type: array
+                minItems: 0
+                maxItems: 99999
+                items:
+                  $ref: "#/components/schemas/partialProfile"
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+  #####################################################################
+
+  /users/{uid}/stream:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+
+    get:
+      tags: ["stream"]
+      summary: returns the stream of the user
+      description: |
+        the stream of the user, containing the photos published
+        by all the users followed in reverse chronological order
+      operationId: getMyStream
+      responses:
+        "200":
+          description: the stream is returned in the content
+          content:
+            application/json:
+              schema:
+                description: |
+                  an array containing the photos published by the users
+                  followed by the user, in reverse chronological order
+                type: array
+                minItems: 0
+                maxItems: 99999
+                items:
+                  $ref: "#/components/schemas/photo"
+        "401":
+          description: the user has no right to access this resource
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+  #####################################################################
+
+  /users/{uid}/photos:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+
+    post:
+      tags: ["photos"]
+      summary: uploads a new photo
+      description: A new image is uploaded in the user's photos
+      operationId: uploadPhoto
+      requestBody:
+        description: an image
+        content:
+          image/*:
+            schema:
+              description: |
+                an object representing the image that the user want to
+                publish
+              type: object
+              properties:
+                newimage:
+                  $ref: "#/components/schemas/binaryImage"
+        required: true
+      responses:
+        "201":
+          description: the photo is successfully uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/photo"
+        "401":
+          description: the user has no right to access this resource
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+  #####################################################################
+
+  /users/{uid}/photos/{photo}:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+    - $ref: "#/components/parameters/photoParam"
+
+    get:
+      tags: ["photos"]
+      summary: returns a photo
+      description: a user can access a photo if e/she is the owner or if the owner has not banned him/her
+      operationId: getPhoto
+      responses:
+        "200":
+          description: the photo is returned in the content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/photo"
+        "401":
+          description: the user has no right to access this resource
+        "403":
+          description: the owner of the photo has banned the user that called the operation
+        "404":
+          description: photo not found
+
+      security:
+        - bearerAuth: []
+
+    delete:
+      tags: ["photos"]
+      summary: remove a photo from the user's photos
+      description: |
+        the photo is deleted and won't appear anymore
+        in the user's photos
+      operationId: deletePhoto
+      responses:
+        "204":
+          description: the photo is successfully removed from the array of photos
+        "401":
+          description: the user has no right to access this resource
+        "403":
+          description: can't delete a photo published by someone else
+        "404":
+          description: can't find the photo
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+  #####################################################################
+
+  /users/{uid}/photos/{photo}/likes:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+    - $ref: "#/components/parameters/photoParam"
+
+    get:
+      tags: ["likes"]
+      summary: the likes on the photo
+      description: |
+        this operation returns the number of likes and the users that like the photo
+      operationId: getLikeOnPhoto
+      responses:
+        "200":
+          description: |
+            the number of likes and the users that like
+            the photo are returned in the content
+          content:
+            application/json:
+              schema:
+                description: |
+                  an object representing the like counter
+                  and the array containing the partial profile of the users
+                  that like the photo
+                type: object
+                properties:
+                  likeCount:
+                    description: how many users like the photo
+                    type: integer
+                    minimum: 0
+                    maximum: 99999
+                    example: 10
+                  likingUsers:
+                    description: |
+                      an array containing the partial profile of the users
+                      that like the photo
+                    type: array
+                    minItems: 0
+                    maxItems: 99999
+                    items:
+                      $ref: "#/components/schemas/partialProfile"
+        "401":
+          description: the user has no right to access this resource
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+  #####################################################################
+
+  /users/{uid}/photos/{photo}/likes/{like}:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+    - $ref: "#/components/parameters/photoParam"
+    - $ref: "#/components/parameters/likeParam"
+
+    put:
+      tags: ["likes"]
+      summary: put a like on a photo
+      description: like a photo published by a followed user
+      operationId: likePhoto
+      responses:
+        "204":
+          description: |
+            the user's partial profile is added in the array and
+            the like counter is updated
+        "401":
+          description: the user has no right to access this resource
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+    delete:
+      tags: ["likes"]
+      summary: removes a like from a photo
+      description: the operations removes the like from a photo
+      operationId: unlikePhoto
+      responses:
+        "204":
+          description: |
+            the user's partial profile is successfully removed from the array
+            and the like counter is updated
+        "400":
+          description: the user can't unlike a photo that he didn't like
+        "401":
+          description: the user has no right to access this resource
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+  #####################################################################
+
+  /users/{uid}/photos/{photo}/comments:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+    - $ref: "#/components/parameters/photoParam"
+
+    get:
+      tags: ["comments"]
+      summary: the comments under a photo
+      description: |
+        the operation returns the number of comments on the photo and
+        all the comments published on it
+      operationId: getComments
+      responses:
+        "200":
+          description: |
+            the comment counter and the comments published
+            on the photo are listed in the content
+          content:
+            application/json:
+              schema:
+                description: |
+                  an object representing the comment counter
+                  and the array containing the comments
+                type: object
+                properties:
+                  commentCount:
+                    description: how many comments were left on the photo
+                    type: integer
+                    minimum: 0
+                    maximum: 99999
+                    example: 3
+                  commentArray:
+                    description: an array containing the comments on the photo
+                    type: array
+                    minItems: 0
+                    maxItems: 99999
+                    items:
+                      $ref: "#/components/schemas/comment"
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+    
+    post:
+      tags: ["comments"]
+      summary: comment a photo
+      description: leave a comment on a photo
+      operationId: commentPhoto
+      requestBody:
+        description: the text that uid want to post as a comment
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/commentOnReq"
+        required: true
+      responses:
+        "201":
+          description: |
+            the comment is added to the comment array of the photo
+            and the comment counter is updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/comment"
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+
+
+  #####################################################################
+
+  /users/{uid}/photos/{photo}/comments/{comment}:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+    - $ref: "#/components/parameters/photoParam"
+    - $ref: "#/components/parameters/commentParam"
+
+    delete:
+      tags: ["comments"]
+      summary: the comment is removed
+      description: the operation removes the comment
+      operationId: uncommentPhoto
+      responses:
+        "204":
+          description: |
+            the comment is removed from the array and
+            the comment counter is updated
+        "403":
+          description: can't delete a comment posted by someone else
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+  #####################################################################
+
+  /users/{uid}/followers:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+
+    get:
+      tags: ["followers"]
+      summary: list all the users that are following the user
+      description: |
+        the operation returns a list of all the users
+        that are following the user
+      operationId: getFollowers
+      responses:
+        "200":
+          description: |
+            the partial profile of the users that are currently following this user
+            are listed in the content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/followers"
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+  #####################################################################
+
+  /users/{uid}/following:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+
+    get:
+      tags: ["following"]
+      summary: list all the users followed
+      description: |
+        returns the list of the uid of all the users currently followed
+      operationId: getFollowing
+      responses:
+        "200":
+          description: |
+            the partial profile of the users that are currently followed by this user
+            are listed in the content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/following"
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+  #####################################################################
+
+  /users/{uid}/following/{followingId}:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+    - $ref: "#/components/parameters/followingUserid"
+
+    put:
+      tags: ["following"]
+      summary: follow a user
+      description: followingId is added in the following list
+      operationId: followUser
+      responses:
+        "204":
+          description: followingId is now in the user's following list
+        "401":
+          description: the user has no right to access this resource
+        "403":
+          description: the user is in followingId's banned list
+        '404':
+          description: can't find followingId
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+    delete:
+      tags: ["following"]
+      summary: unfollow a user
+      description: the operation removes followingId from the user's following list
+      operationId: unfollowUser
+      responses:
+        '204':
+          description: followingId is removed from the following list
+        '400':
+          description: followingId isn't already in the user's following list
+        "401":
+          description: the user has no right to access this resource
+        '404':
+          description: can't find followingId
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+  #####################################################################
+
+  /users/{uid}/banned:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+
+    get:
+      tags: ["ban"]
+      summary: list all the users currently banned
+      description: |
+        returns the list of the uid of all the users currently banned
+      operationId: getBanned
+      responses:
+        "200":
+          description: |
+            the user id of all the users banned by the user
+            are listed in the content
+          content:
+            application/json:
+              schema:
+                description: |
+                  an array of strings, where every string is the partial profile
+                  of one of the users banned
+                type: array
+                minItems: 0
+                maxItems: 99999
+                items:
+                  $ref: "#/components/schemas/partialProfile"
+        "401":
+          description: the user has no right to access this resource
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+  #####################################################################
+
+  /users/{uid}/banned/{bannedId}:
+    parameters:
+    - $ref: "#/components/parameters/userid"
+    - $ref: '#/components/parameters/bannedUserId'
+
+    put:
+      tags: ["ban"]
+      summary: ban another user
+      description: bannedId is added to the user's banned list
+      operationId: banUser
+      responses:
+        "204":
+          description: bannedId is added to the user's banned list
+        "401":
+          description: the user has no right to access this resource
+        "403":
+          description: the user is in bannedId's banned list
+        "404":
+          description: can't find bannedId
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+    delete:
+      tags: ["ban"]
+      summary: unban a user
+      description: bannedId is removed from the user's banned list
+      operationId: unbanUser
+      responses:
+        "204":
+          description: bannedId is removed from the user's banned list
+        "400":
+          description: bannedId isn't already in the user's banned list
+        "401":
+          description: the user has no right to access this resource
+        "404":
+          description: can't find bannedId
+        "500":
+          description: the server has encountered an unknown error
+
+      security:
+        - bearerAuth: []
+
+#######################################################################
+#######################################################################
+#######################################################################
+
+components:
+
+  schemas:
+
+    userProfile:
+      description: |
+        an object representing a user's profile: it includes the user id
+        and the username of the user, the profile picture that the user has chosen,
+        an array containing all the photos that the user has published, how many photos
+        the user has published, an array containing the partial profile of the users that are following
+        the user, how many users are following the user, an array containing the partial profile
+        of the users that are followed by the user, how many users are followed by the user
+      type: object
+      properties:
+        userid:
+          $ref: "#/components/schemas/userid"
+        username:
+          $ref: "#/components/schemas/username"
+        profilePict:
+          $ref: "#/components/schemas/image"
+        photos:
+          description: an array of photos
+          type: array
+          minItems: 0
+          maxItems: 99999
+          items:
+            $ref: "#/components/schemas/photo"
+        photoCounter:
+          description: how many photos are in this profile
+          type: integer
+          default: 0
+          minimum: 0
+          maximum: 99999
+          example: 3
+        followers:
+            $ref: "#/components/schemas/followers"
+        followersCounter:
+          description: how many users follow this profile
+          type: integer
+          default: 0
+          minimum: 0
+          maximum: 99999
+          example: 120
+        following:
+          $ref: "#/components/schemas/following"
+        followingCounter:
+          description: how many users are followed by this profile
+          type: integer
+          default: 0
+          minimum: 0
+          maximum: 99999
+          example: 95
+
+  ###################################################################
+
+    photo:
+      description: |
+        an object representing a photo published by someone: it includes an identifier for
+        the photo, the username of the user who published the photo, the image (represented
+        by its identifier and the path to the folder in which the image is stored), the date in which
+        the photo was published, an array containing the partial profile of the users that like the photo,
+        an array containing the comments published on the photo, how many likes and comments were left on the photo
+      type: object
+      properties:
+        photoIdentifier:
+          $ref: "#/components/schemas/photoId"
+        owner:
+          $ref: "#/components/schemas/username"
+        image:
+          $ref: "#/components/schemas/image"
+        updateDate:
+          description: the image's update date
+          type: string
+          format: date
+          minLength: 10
+          maxLength: 10
+          example: "2023-12-09"
+        likesOnPhoto:
+          description: |
+            an array containing the username of all the users
+            that liked the photo
+          type: array
+          minItems: 0
+          maxItems: 99999
+          items:
+            $ref: "#/components/schemas/partialProfile"
+        likeCount:
+          description: how many likes are left on the photo
+          type: integer
+          minimum: 0
+          maximum: 99999
+          example: 10
+        commentsOnPhoto:
+          description: an array containing all the comments published on the photo
+          type: array
+          minItems: 0
+          maxItems: 99999
+          items:
+            $ref: "#/components/schemas/comment"
+        commentCount:
+          description: how many comments are published under the photo
+          type: integer
+          minimum: 0
+          maximum: 99999
+          example: 5
+
+  ###################################################################
+
+    comment:
+      description: |
+        an object representing an identifier for the comment, the partial profile
+        of the user who wrote the comment, the id of the photo on which he wrote the comment,
+        the text that he wrote as a comment and the date in which he wrote it
+      type: object
+      properties:
+        commentIdentifier:
+          $ref: "#/components/schemas/commentId"
+        userWriter:
+          $ref: "#/components/schemas/partialProfile"
+        onPhoto:
+          $ref: "#/components/schemas/photoId"
+        saying:
+          $ref: "#/components/schemas/commentOnReq"
+        publishingDate:
+          description: the date in which the comment was published
+          type: string
+          format: date
+          minLength: 10
+          maxLength: 10
+          example: "2023-12-09"
+
+    ###################################################################
+
+    partialProfile:
+      description: an object representing a user's personal infos (userid, username and profile picture)
+      type: object
+      properties:
+        userid:
+          $ref: "#/components/schemas/userid"
+        username:
+          $ref: "#/components/schemas/username"
+        profilePict:
+          $ref: "#/components/schemas/image"
+
+    ###################################################################
+
+    commentOnReq:
+      description: the string that the user wants to publish as a comment
+      type: string
+      pattern: '^.*?$'
+      minLength: 1
+      maxLength: 300
+      example: "Nice photo!"
+
+    ###################################################################
+
+    user:
+      description: an object representing the username and the userid of a user
+      type: object
+      properties:
+        userid:
+          $ref: "#/components/schemas/userid"
+        username:
+          $ref: "#/components/schemas/username"
+
+    ###################################################################
+
+    username:
+      description: the username chosen by the user
+      type: string
+      example: Maria
+      pattern: '^.*?$'
+      minLength: 3
+      maxLength: 16
+
+  ###################################################################
+
+    userid:
+      description: this is the user id returned by the doLogin function
+      type: string
+      example: "abcdef012345"
+      pattern: '^.*?$'
+      minLength: 3
+      maxLength: 16
+      readOnly: true
+
+      ###################################################################
+
+    followers:
+      description: |
+        an array of users,
+        each one represented by his partial profile
+      type: array
+      minItems: 0
+      maxItems: 99999
+      items:
+        $ref: "#/components/schemas/partialProfile"
+
+  ###################################################################
+
+    following:
+      description: |
+        an array of users,
+        each one represented by his partial profile
+      type: array
+      minItems: 0
+      maxItems: 99999
+      items:
+          $ref: "#/components/schemas/partialProfile"
+
+  ###################################################################
+
+    image:
+      description: |
+        an object representing the image identifier and the path to the folder in which the image is stored
+      type: object
+      properties:
+        imageIdentifier:
+          $ref: "#/components/schemas/imageId"
+        pathToImage:
+          description: the path to the folder in which the image is stored
+          type: string
+          pattern: '^[/].*?$'
+          minLength: 1
+          maxLength: 99999
+          example: "/tmp/media/pippo/photos/123"
+
+  ###################################################################
+
+    imageId:
+      description: the unique identifier for an image
+      type: integer
+      minimum: 0
+      example: 1234
+      readOnly: true
+
+  ###################################################################
+
+    binaryImage:
+      description: the image in binary format
+      type: string
+      format: binary
+      minLength: 1
+      maxLength: 99999
+      example: "0110101001"
+
+  ###################################################################
+
+    photoId:
+      description: the unique identifier for a photo published by someone
+      type: integer
+      minimum: 0
+      example: 1234
+      readOnly: true
+
+  ###################################################################
+
+    commentId:
+      description: the unique identifier for a photo published by someone
+      type: integer
+      minimum: 0
+      example: 1234
+      readOnly: true
+
+  ###################################################################
+  ###################################################################
+  ###################################################################
+
+  parameters:
+
+    userid:
+      name: uid
+      in: path
+      description: this is the user id returned by the doLogin function
+      required: true
+      schema:
+        $ref: "#/components/schemas/userid"
+
+  ###################################################################
+
+    likeParam:
+      name: like
+      in: path
+      description: the username of the user that liked or that wants to like a photo
+      required: true
+      schema:
+        $ref: "#/components/schemas/username"
+
+  ###################################################################
+
+    followingUserid:
+      name: followingId
+      in: path
+      description: this is the user id of a user
+      required: true
+      schema:
+        $ref: "#/components/schemas/userid"
+
+  ###################################################################
+
+    bannedUserId:
+      name: bannedId
+      in: path
+      description: this is the user id of a user
+      required: true
+      schema:
+        $ref: "#/components/schemas/userid"
+
+  ###################################################################
+
+    photoParam:
+      name: photo
+      in: path
+      required: true
+      description: a photo published by someone
+      schema:
+        $ref: "#/components/schemas/photo"
+
+  ###################################################################
+
+    commentParam:
+      name: comment
+      in: path
+      required: true
+      description: this is the comment posted on the photo
+      schema:
+        $ref: "#/components/schemas/comment"
+
+  ###################################################################
+
+    searchednameParam:
+      name: searchedname
+      in: path
+      required: true
+      description: the name searched using the searchUser operation, it can be the username, the userid or part of one of them
+      schema:
+        description: a string representing a username, a userid or part of one of them
+        type: string
+        pattern: '^.*?$'
+        minLength: 1
+        maxLength: 99999
+        example: "pippo"
+
+  ###################################################################
+
+    imageIdParam:
+      name: imageId
+      in: path
+      required: true
+      description: this is the identifier of an image
+      schema:
+        $ref: "#/components/schemas/imageId"
+
+  ###################################################################
+  ###################################################################
+  ###################################################################
+
+  securitySchemes:
+
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  ###################################################################
